@@ -50,7 +50,7 @@ def tissue_selector():
     ans = str(input('"Human Protein Atlas"(0) or "GTEx"(1) ? '))
     if ans == '1':
         dt = pd.read_csv(
-            '/Users/german/Dropbox/CardioCenter/Papers/2020/375_РФФИ/data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct',
+            './addData/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct',
             sep='\t')  # загрузка med(TPM) from GTEx
 
         print('Gene universe is...')
