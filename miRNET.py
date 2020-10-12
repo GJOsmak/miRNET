@@ -50,7 +50,7 @@ def tissue_selector():
     ans = str(input('"Human Protein Atlas"(0) or "GTEx"(1) ? '))
     if ans == '1':
         dt = pd.read_csv(
-            './addData/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct',
+            '/Users/german/Dropbox/CardioCenter/Papers/2020/375_РФФИ/data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct',
             sep='\t')  # загрузка med(TPM) from GTEx
 
         print('Gene universe is...')
@@ -65,8 +65,10 @@ def tissue_selector():
 
         if tissue_id != 'all':
             tissue = labels[int(tissue_id)]
-            print('your tissue is ', tissue)
-            return set(dt['Description'][dt[tissue] > 0])
+            tissue_genes = set(dt['Description'][dt[tissue] > 0])
+            print('your tissue is ', tissue, ' number of genes: ', len(tissue_genes))
+            
+            return tissue_genes
         else:
             return 'all'
 
@@ -86,8 +88,9 @@ def tissue_selector():
 
         if tissue_id != 'all':
             tissue = labels[int(tissue_id)]
-            print('your tissue is ', tissue)
-            return set(dt['Gene name'][dt['Tissue']==tissue])
+            tissue_genes = set(dt[(dt['Tissue'] == tissue) & (dt['Level'] != 'Not detected')]['Gene name'])
+            print('your tissue is ', tissue, ' number of genes: ', len(tissue_genes))
+            return tissue_genes
         else:
             return 'all'
     else:
