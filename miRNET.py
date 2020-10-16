@@ -319,6 +319,11 @@ def draw_central_distr(miR_G, key_nodes, mir_name):
     ax.tick_params(labelsize=20)
 
     ax.axvline(key_nodes[list(key_nodes.keys())[-1]], color='red', lw='4')
+    
+    right_side = ax.spines["right"]
+    right_side.set_visible(False)
+    top_side = ax.spines["top"]
+    top_side.set_visible(False)
 
     # create gradient (grey_to_red hist path
     grey = Color('#cccccc')
@@ -350,19 +355,26 @@ def draw_key_nodes_extractor(card_LCC, n_CC, idx_max_dy, mir_name):
     fig = plt.figure()
     ax = fig.add_subplot()
     ax.plot(card_LCC, linewidth=4, label='Cardinality of the LCC')
-    ax.plot(n_CC, linewidth=4, label='Count of CC')
+    ax.plot(n_CC, linewidth=4, label='Count of CC', color='tab:green', linestyle='dashed')
     # ax.plot(idx_max_dy, card_LCC[idx_max_dy], marker='o', markersize=20, color="red")
     ax.axvline(idx_max_dy, color='red', lw='4')
     ax.minorticks_on()
     ax.grid(which='major',
+            color='w',
             linewidth=1.3)
     ax.grid(which='minor',
-            color='grey',
+            color='w',
             linestyle=':')
     ax.set(xlabel='Number of top nodes removed',
-           ylabel='Count')
+           ylabel='LCC cardinality / Count of CC')
     ax.legend()
-    plt.rc('font', size=10)  # controls default text sizes
+    
+    right_side = ax.spines["right"]
+    right_side.set_visible(False)
+    top_side = ax.spines["top"]
+    top_side.set_visible(False)
+    
+#    plt.rc('font', size=10)  # controls default text sizes
     plt.rc('axes', labelsize=30)  # fontsize of the x and y labels
     plt.rc('xtick', labelsize=20)  # fontsize of the tick labels
     plt.rc('ytick', labelsize=20)  # fontsize of the tick labels
