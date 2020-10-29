@@ -108,10 +108,9 @@ def get_LCC(G):
 
 def inflection_finder(card_LCC, n_CC, sigma):
     """
-    :param card_LCC: число узлов в LCC
-    :param n_CC: количество компонент связности
-    :return: индекс последнего ключевого узла, после удаления которого сеть перестает стремительно
-    разваливаться
+    :param card_LCC: cardinality of the LCC
+    :param n_CC: number of connected components in the Network
+    :return: the index of the last key node, after the removal of which the network stops rapidly falling apart
     """
 
     y = gaussian_filter1d(card_LCC, sigma=sigma)
@@ -193,7 +192,7 @@ def key_nodes_extractor(G, node_centrality):
 
 class Targets:
     """
-    Класс извелекает и хранит мишени одной микроРНК и её имя
+    The class extracts and stores the targets of one microRNA and its name
     """
 
     miR_dict = {}
