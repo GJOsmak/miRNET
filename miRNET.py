@@ -103,6 +103,10 @@ def get_LCC(G):
     :return: the Largest Connected Component, as NetrworkX object
     """
     CC_G = sorted(nx.connected_component_subgraphs(G), key=len, reverse=True)
+
+    # print(len(CC_G), 'total connected components')
+    # print(len(CC_G[0].nodes), 'LCC cardinality')
+
     return CC_G[0]
 
 
