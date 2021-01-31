@@ -20,32 +20,6 @@ interactome = pd.read_csv('./baseData/String_interactome.csv')
 G = nx.from_pandas_edgelist(interactome, 'Source', 'Target')
 
 
-def target_list_creator(miR_name, miR_names, miR_dict):
-    """
-    miRTarBase содержит разные формы miRNA, так например, miR-21- может соответствовать
-    miR-21-3p и miR-21-5p. Функция конкатенирует таргеты всех форм микроРНК и удалаяет дубли,
-    которые возникают из-за того, что одной и тойже мишени может соответствовать несколько строк из-за
-    разные методов её подтверждения.
-    """
-
-    res = set()
-    mir_name_app = []
-
-    for name in miR_names:
-        if miR_name in name:
-            res.update(miR_dict[name])
-            mir_name_app.append(name)
-
-    if not mir_name_app:
-        print('miRNA', '"{}"'.format(miR_name), 'not found, use another name')
-        return
-
-    print('I found a miRNA with name:', *mir_name_app)
-    print('and ', len(res), 'unique targets')
-
-    return res
-
-
 def tissue_selector():
     ans = str(input('"Human Protein Atlas"(0) or "GTEx"(1) ? '))
     if ans == '1':
@@ -207,6 +181,32 @@ class Targets:
                 miR_dict[key] += [val]
             else:
                 miR_dict[key] = [val]
+
+    def target_list_creator(miR_name, miR_names, miR_dict):
+        """
+        miRTarBase содержит разные формы miRNA, так например, miR-21- может соответствовать
+        miR-21-3p и miR-21-5p. Функция конкатенирует таргеты всех форм микроРНК и удалаяет дубли,
+        которые возникают из-за того, что одной и тойже мишени может соответствовать несколько строк из-за
+        разные методов её подтверждения.
+        """
+
+        res = set()
+        mir_name_app = []
+
+        for name in miR_names:
+            if miR_name in name:
+                res.update(miR_dict[name])
+                mir_name_app.append(name)
+
+        if not mir_name_app:
+            print('miRNA', '"{}"'.format(miR_name), 'not found, use another name')
+            return
+
+        print('I found a miRNA with name:', *mir_name_app)
+        print('and ', len(res), 'unique targets')
+
+        return res
+
 
     def __init__(self, miR_name):
         self.miR_name = miR_name
