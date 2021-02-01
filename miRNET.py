@@ -8,16 +8,14 @@ from scipy.ndimage import gaussian_filter1d
 import numpy as np
 from colour import Color
 
-#   loading external data
-
-#   load disease genes associated in experiments
-with open('./addData/CADgens_DisGenNET.txt', 'r') as file:
-    CADgens = file.readline().strip().split(' ')
-file.close()
 
 #   load interactome from String and convert to nx Graph
-interactome = pd.read_csv('./baseData/String_interactome.csv')
-G = nx.from_pandas_edgelist(interactome, 'Source', 'Target')
+
+class BaseData:
+
+    def __init__(self):
+        string = pd.read_csv('./baseData/String_interactome.csv')
+        self.Interactome = nx.from_pandas_edgelist(string, 'Source', 'Target')
 
 
 def tissue_selector():
@@ -41,7 +39,7 @@ def tissue_selector():
             tissue = labels[int(tissue_id)]
             tissue_genes = set(dt['Description'][dt[tissue] > 0])
             print('your tissue is ', tissue, ' number of genes: ', len(tissue_genes))
-            
+
             return tissue_genes
         else:
             return 'all'
@@ -124,7 +122,6 @@ def edge_centrality_calc(G):
 
 def key_nodes_extractor(G, node_centrality):
     """
-
     :param G: NetworkX graph
     :param node_centrality: sorted dict of node centrality
     :return: list of key nodes and dict of some graph characteristics
@@ -133,7 +130,7 @@ def key_nodes_extractor(G, node_centrality):
     graph_char = {'card_LCC': [len(G_copy.nodes())],
                   'n_CC': [len(list(nx.connected_component_subgraphs(G_copy)))],
                   'transitivity': [nx.transitivity(G_copy)],
-                  'sh_path': [nx.average_shortest_path_length(G_copy)/len(G_copy.nodes())]}
+                  'sh_path': [nx.average_shortest_path_length(G_copy) / len(G_copy.nodes())]}
 
     for k, v in node_centrality.items():
 
@@ -146,8 +143,7 @@ def key_nodes_extractor(G, node_centrality):
         graph_char['card_LCC'].append(len(LCC_curent.nodes()))
         graph_char['n_CC'].append(len(list(nx.connected_component_subgraphs(G_copy))))
         graph_char['transitivity'].append(nx.transitivity(LCC_curent))
-        graph_char['sh_path'].append(nx.average_shortest_path_length(LCC_curent)/len(LCC_curent.nodes()))
-
+        graph_char['sh_path'].append(nx.average_shortest_path_length(LCC_curent) / len(LCC_curent.nodes()))
 
     # find inflection point of function
 
@@ -182,13 +178,16 @@ class Targets:
             else:
                 miR_dict[key] = [val]
 
-    def target_list_creator(miR_name, miR_names, miR_dict):
+    def get_targets(self, miR_name):
         """
         miRTarBase содержит разные формы miRNA, так например, miR-21- может соответствовать
         miR-21-3p и miR-21-5p. Функция конкатенирует таргеты всех форм микроРНК и удалаяет дубли,
         которые возникают из-за того, что одной и тойже мишени может соответствовать несколько строк из-за
         разные методов её подтверждения.
         """
+
+        miR_names = self.miR_dict.keys()
+        miR_dict = self.miR_dict
 
         res = set()
         mir_name_app = []
@@ -208,23 +207,14 @@ class Targets:
         return res
 
 
-    def __init__(self, miR_name):
-        self.miR_name = miR_name
-        self.miR_targets = target_list_creator(miR_name=self.miR_name, miR_names=self.miR_dict.keys(),
-                                               miR_dict=self.miR_dict)
-
-
 class MainMirNetwork:
 
-    def __init__(self, G, targets, CADgens, gene_set='all'):
+    def __init__(self, G, targets, gene_set='all'):
         """
-
         :param G: NetworkX graph
         :param targets: targets of miRNA
-        :param CADgens: disease gene
         :param gene_set: tissue or another gene set
         """
-        self.CADgenes = CADgens
         self.tis_gene = gene_set
         self.LCC_G = get_LCC(G)
         if self.tis_gene != 'all':  # collapse an interactome to the tissue-specific interactome
@@ -234,10 +224,6 @@ class MainMirNetwork:
         self.centrality_edge = edge_centrality_calc(G=self.LCC_miR_G)
 
         for nods, dct in self.LCC_miR_G.nodes(data=True):
-            if nods in CADgens:
-                dct['CADgene'] = 1
-            else:
-                dct['CADgene'] = 0
             dct['BtweenCentrl'] = self.centrality_node[nods]
 
         for nods1, nods2, dct in self.LCC_miR_G.edges(data=True):
@@ -322,7 +308,7 @@ def draw_central_distr(miR_G, key_nodes, mir_name):
     ax.tick_params(labelsize=20)
 
     ax.axvline(key_nodes[list(key_nodes.keys())[-1]], color='red', lw='4')
-    
+
     right_side = ax.spines["right"]
     right_side.set_visible(False)
     top_side = ax.spines["top"]
@@ -371,13 +357,13 @@ def draw_key_nodes_extractor(card_LCC, n_CC, idx_max_dy, mir_name):
     ax.set(xlabel='Number of top nodes removed',
            ylabel='LCC cardinality / Count of CC')
     ax.legend()
-    
+
     right_side = ax.spines["right"]
     right_side.set_visible(False)
     top_side = ax.spines["top"]
     top_side.set_visible(False)
-    
-#    plt.rc('font', size=10)  # controls default text sizes
+
+    #    plt.rc('font', size=10)  # controls default text sizes
     plt.rc('axes', labelsize=30)  # fontsize of the x and y labels
     plt.rc('xtick', labelsize=20)  # fontsize of the tick labels
     plt.rc('ytick', labelsize=20)  # fontsize of the tick labels
