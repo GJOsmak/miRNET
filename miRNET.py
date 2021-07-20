@@ -15,14 +15,14 @@ class BaseData:
 
     def __init__(self):
         string = pd.read_csv('./baseData/String_interactome.csv')
-        self.Interactome = nx.from_pandas_edgelist(string, 'Source', 'Target')
+        self.interactome = nx.from_pandas_edgelist(string, 'Source', 'Target')
 
 
 def tissue_selector():
     ans = str(input('"Human Protein Atlas"(0) or "GTEx"(1) ? '))
     if ans == '1':
         dt = pd.read_csv(
-            '/Users/german/Dropbox/CardioCenter/Papers/2020/375_РФФИ/data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct',
+            './addData/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_median_tpm.gct',
             sep='\t')  # загрузка med(TPM) from GTEx
 
         print('Gene universe is...')
@@ -69,99 +69,64 @@ def tissue_selector():
         return tissue_selector()
 
 
-def get_LCC(G):
-    """
-    :param G: networkX Graph
-    :return: the Largest Connected Component, as NetrworkX object
-    """
-    CC_G = sorted(nx.connected_component_subgraphs(G), key=len, reverse=True)
+class KeyNodesExtractor:
 
-    # print(len(CC_G), 'total connected components')
-    # print(len(CC_G[0].nodes), 'LCC cardinality')
+    def __init__(self, Regulome):
+        self.key_nodes = dict()
+        self.net = Regulome.get_LCC()
+        self.node_centrality = Regulome.get_LCCnd_centrality()
+        self.graph_features = {'card_LCC': [len(self.net.nodes())],
+                               'n_CC': [len(list(nx.connected_component_subgraphs(self.net)))],
+                               'transitivity': [nx.transitivity(self.net)],
+                               'sh_path': [nx.average_shortest_path_length(self.net) / len(self.net.nodes())]}
 
-    return CC_G[0]
+    @staticmethod
+    def inflection_finder(card_LCC, n_CC, sigma):
+        """
+        :param sigma: smoothing
+        :param card_LCC: cardinality of the LCC
+        :param n_CC: number of connected components in the Network
+        :return: the index of the last key node, after the removal of which the network stops rapidly falling apart
+        """
 
+        y = gaussian_filter1d(card_LCC, sigma=sigma)
+        dy = np.diff(y)  # first derivative
+        idx_max_dy = np.argmax(dy)
+        if card_LCC[idx_max_dy] > n_CC[idx_max_dy]:
+            return KeyNodesExtractor.inflection_finder(n_CC, sigma + 0.2)
+        else:
+            return idx_max_dy
 
-def inflection_finder(card_LCC, n_CC, sigma):
-    """
-    :param card_LCC: cardinality of the LCC
-    :param n_CC: number of connected components in the Network
-    :return: the index of the last key node, after the removal of which the network stops rapidly falling apart
-    """
+    def extraction(self):
 
-    y = gaussian_filter1d(card_LCC, sigma=sigma)
-    dy = np.diff(y)  # first derivative
-    idx_max_dy = np.argmax(dy)
-    if card_LCC[idx_max_dy] > n_CC[idx_max_dy]:
-        return inflection_finder(card_LCC, n_CC, sigma + 0.2)
-    else:
-        return idx_max_dy
+        for k, v in self.node_centrality.items():
 
+            if v == 0:
+                break
+            self.net.remove_node(k)
+            if len(self.net.nodes()) == 0:
+                break
+            LCC_curent = Regulome(self.net).get_LCC()
+            self.graph_features['card_LCC'].append(len(LCC_curent.nodes()))
+            self.graph_features['n_CC'].append(len(list(nx.connected_component_subgraphs(self.net))))
+            self.graph_features['transitivity'].append(nx.transitivity(LCC_curent))
+            self.graph_features['sh_path'].append(nx.average_shortest_path_length(LCC_curent) / len(LCC_curent.nodes()))
 
-def node_centrality_calc(G):
-    """
-    :param G: a Graph
-    :return: sorted dict of node centrality
-    """
-    centrality_node = nx.betweenness_centrality(G)
-    degree_centrality = nx.degree_centrality(G)
-    for k, v in centrality_node.items():
-        centrality_node[k] = centrality_node[k] + degree_centrality[k]
-    centrality_node = {k: v for k, v in sorted(centrality_node.items(), key=lambda item: item[1], reverse=True)}
-    return centrality_node
+        # find inflection point of function
 
+        idx_max_dy = KeyNodesExtractor.inflection_finder(card_LCC=self.graph_features['card_LCC'],
+                                                         n_CC=self.graph_features['n_CC'],
+                                                         sigma=0.0001)
 
-def edge_centrality_calc(G):
-    """
-    :param G: a Graph
-    :return: dict of edge centrality
-    """
-    edge_centrality = nx.edge_betweenness_centrality(G)
-    return edge_centrality
+        # idx_max_dy = np.argmax(np.array(graph_char['n_CC']) > np.array(graph_char['card_LCC']))
 
+        self.graph_features['cutoff_point'] = idx_max_dy
 
-def key_nodes_extractor(G, node_centrality):
-    """
-    :param G: NetworkX graph
-    :param node_centrality: sorted dict of node centrality
-    :return: list of key nodes and dict of some graph characteristics
-    """
-    G_copy = nx.Graph(G)
-    graph_char = {'card_LCC': [len(G_copy.nodes())],
-                  'n_CC': [len(list(nx.connected_component_subgraphs(G_copy)))],
-                  'transitivity': [nx.transitivity(G_copy)],
-                  'sh_path': [nx.average_shortest_path_length(G_copy) / len(G_copy.nodes())]}
+        for i in range(0, idx_max_dy + 1):
+            nods = list(self.node_centrality.keys())[i]
+            self.key_nodes[nods] = self.node_centrality[nods]
 
-    for k, v in node_centrality.items():
-
-        if v == 0:
-            break
-        G_copy.remove_node(k)
-        if len(G_copy.nodes()) == 0:
-            break
-        LCC_curent = get_LCC(G_copy)
-        graph_char['card_LCC'].append(len(LCC_curent.nodes()))
-        graph_char['n_CC'].append(len(list(nx.connected_component_subgraphs(G_copy))))
-        graph_char['transitivity'].append(nx.transitivity(LCC_curent))
-        graph_char['sh_path'].append(nx.average_shortest_path_length(LCC_curent) / len(LCC_curent.nodes()))
-
-    # find inflection point of function
-
-    idx_max_dy = inflection_finder(card_LCC=graph_char['card_LCC'],
-                                   n_CC=graph_char['n_CC'],
-                                   sigma=0.0001)
-
-    key_nodes = dict()
-
-    # idx_max_dy = np.argmax(np.array(graph_char['n_CC']) > np.array(graph_char['card_LCC']))
-
-    graph_char['cutoff_point'] = idx_max_dy
-
-    for i in range(0, idx_max_dy + 1):
-        nods = list(node_centrality.keys())[i]
-        key_nodes[nods] = node_centrality[nods]
-
-    return key_nodes, graph_char
+        return self.key_nodes.keys()
 
 
 class Targets:
@@ -207,169 +172,202 @@ class Targets:
         return res
 
 
-class MainMirNetwork:
+class Regulome:
 
-    def __init__(self, G, targets, gene_set='all'):
+    def __init__(self, interactome):
+        self.G = interactome
+
+    def get_LCCnd_centrality(self):
         """
-        :param G: NetworkX graph
-        :param targets: targets of miRNA
+        :param G: a Graph
+        :return: sorted dict of node centrality
+        """
+        centrality_node = nx.betweenness_centrality(self.get_LCC())
+        degree_centrality = nx.degree_centrality(self.get_LCC())
+        for k, v in centrality_node.items():
+            centrality_node[k] = centrality_node[k] + degree_centrality[k]
+        centrality_node = {k: v for k, v in sorted(centrality_node.items(), key=lambda item: item[1], reverse=True)}
+
+        for nods, dct in self.LCC.nodes(data=True):
+            dct['BtweenCentrl'] = centrality_node[nods]
+
+        return centrality_node
+
+    def get_LCC(self):
+        """
+        :param G: networkX Graph
+        :return: the Largest Connected Component, as NetrworkX object
+        """
+        CC_G = sorted(nx.connected_component_subgraphs(self.G), key=len, reverse=True)
+        self.LCC = CC_G[0]
+
+        # print(len(CC_G), 'total connected components')
+        # print(len(CC_G[0].nodes), 'LCC cardinality')
+
+        return CC_G[0]
+
+    def select_nodes(self, gene_set):
+        """
         :param gene_set: tissue or another gene set
         """
-        self.tis_gene = gene_set
-        self.LCC_G = get_LCC(G)
-        if self.tis_gene != 'all':  # collapse an interactome to the tissue-specific interactome
-            self.LCC_G = self.LCC_G.subgraph(self.tis_gene)
-        self.LCC_miR_G = nx.Graph(get_LCC(self.LCC_G.subgraph(targets)))
-        self.centrality_node = node_centrality_calc(G=self.LCC_miR_G)  # sorted dict
-        self.centrality_edge = edge_centrality_calc(G=self.LCC_miR_G)
 
-        for nods, dct in self.LCC_miR_G.nodes(data=True):
-            dct['BtweenCentrl'] = self.centrality_node[nods]
-
-        for nods1, nods2, dct in self.LCC_miR_G.edges(data=True):
-            dct['BtweenCentrl'] = self.centrality_edge[(nods1, nods2)]
-
-        self.key_nodes, self.graph_char = \
-            key_nodes_extractor(G=self.LCC_miR_G, node_centrality=self.centrality_node)
-
-        for nods, dct in self.LCC_miR_G.nodes(data=True):
-            if nods in self.key_nodes.keys():
-                dct['key_nodes_flag'] = 1
-            else:
-                dct['key_nodes_flag'] = 0
+        self.G = self.G.subgraph(gene_set)
+        if self.LCC:
+            self.LCC = self.LCC.subgraph(gene_set)
 
 
 #   visualisation tools
 
-def draw_graph_to_cytoscape(miR_G, centrality_node):
-    miR_G = nx.Graph(miR_G)  # unfreezing of the graph
-    rem_CC = 0
+class plots:
 
-    for CC in list(nx.connected_components(miR_G)):
-        if len(CC) < 3:
-            miR_G.remove_nodes_from(CC)
-            rem_CC += 1
+    def __init__(self, Regulome, KeyNodesExtractor, miR_name):
+        self.miR_G = Regulome.LCC
+        self.key_nodes = KeyNodesExtractor.key_nodes
+        self.miR_name = miR_name
+        self.centrality_node = Regulome.get_LCCnd_centrality()
+        self.card_LCC = KeyNodesExtractor.graph_features['card_LCC']
+        self.n_CC = KeyNodesExtractor.graph_features['n_CC']
+        self.idx_max_dy = KeyNodesExtractor.graph_features['cutoff_point']
 
-    print(rem_CC, ' network components with less than two nodes have been removed', end='\n')
+    def central_distr(self):
+        miR_G = self.miR_G
+        key_nodes = self.key_nodes
+        mir_name = self.miR_name
 
-    PORT_NUMBER = 1234
-    IP = 'localhost'
-    BASE = 'http://' + IP + ':' + str(PORT_NUMBER) + '/v1/'
+        """
 
-    requests.delete(BASE + 'session')  # Delete all networks in current session
+        :param miR_G: a Graph of miRNA
+        :param key_nodes: key_nodes from MainMiRNetwork.key_nodes
+        :param mir_name: miR name for saving file
+        :return: visualisation hist of centrality distribution
+        """
 
-    cytoscape_network = cy.from_networkx(miR_G)
-    cytoscape_network['data']['name'] = 'miR_Net'
-    res1 = requests.post(BASE + 'networks', data=json.dumps(cytoscape_network))
-    res1_dict = res1.json()
-    new_suid = res1_dict['networkSUID']
-    requests.get(BASE + 'apply/layouts/force-directed/' + str(new_suid))
+        fig = plt.figure()
+        ax = fig.add_subplot()
+        N, bins, patches = ax.hist([miR_G.nodes[node]['BtweenCentrl'] for node in miR_G.nodes])
+        ax.set(xlabel='Centrality',
+               ylabel='Count of nodes')
+        ax.yaxis.label.set_size(30)
+        ax.xaxis.label.set_size(30)
+        ax.tick_params(labelsize=20)
 
-    # load and apply style
+        ax.axvline(key_nodes[list(key_nodes.keys())[-1]], color='red', lw='4')
 
-    res = requests.get(BASE + 'styles/miR_Net_Styles')
-    if res.status_code != 200:
+        right_side = ax.spines["right"]
+        right_side.set_visible(False)
+        top_side = ax.spines["top"]
+        top_side.set_visible(False)
 
-        with open('./options/cytoscape_styles/miR_Net_Styles.json') as json_file:
-            miR_Net_Styles = json.load(json_file)
+        # create gradient (grey_to_red hist path
+        grey = Color('#cccccc')
+        colors = list(grey.range_to(Color("red"), len(bins) - 1))
+        for tmp_color, tmp_patch in zip(colors, patches):
+            color = str(tmp_color)
+            if len(color) < 7 and color[0] == '#':
+                color = color + (7 - len(color)) * color[len(color) - 1]
+            tmp_patch.set_facecolor(color)
 
-        for mapings in range(0, len(miR_Net_Styles['mappings'])):
-            if miR_Net_Styles['mappings'][mapings]['visualProperty'] == 'NODE_LABEL_FONT_SIZE':
-                miR_Net_Styles['mappings'][mapings]['points'][1]['value'] = max(centrality_node.values())
-            if miR_Net_Styles['mappings'][mapings]['visualProperty'] == 'NODE_SIZE':
-                miR_Net_Styles['mappings'][mapings]['points'][1]['value'] = max(centrality_node.values())
-            if miR_Net_Styles['mappings'][mapings]['visualProperty'] == 'NODE_FILL_COLOR':
-                miR_Net_Styles['mappings'][mapings]['points'][1]['value'] = max(centrality_node.values())
+        fig.set_figwidth(8.5)
+        fig.set_figheight(8.5)
 
-        # Create new Visual Style
-        res = requests.post(BASE + "styles", data=json.dumps(miR_Net_Styles))
+        plt.tight_layout()
 
-    # Apply it to current network
+        plt.savefig('./result/' + mir_name + '_centrality_distr.png', dpi=250)
 
-    requests.get(BASE + 'apply/styles/' + 'miR_Net_Styles' + '/' + str(new_suid))  # !Это говно почему-то не работает
+    def graph_to_cytoscape(self):
 
+        miR_G = nx.Graph(self.miR_G)  # unfreezing of the graph
+        centrality_node = self.centrality_node
+        rem_CC = 0
 
-def draw_central_distr(miR_G, key_nodes, mir_name):
-    """
+        for CC in list(nx.connected_components(miR_G)):
+            if len(CC) < 3:
+                miR_G.remove_nodes_from(CC)
+                rem_CC += 1
 
-    :param miR_G: a Graph of miRNA
-    :param key_nodes: key_nodes from MainMiRNetwork.key_nodes
-    :param mir_name: miR name for saving file
-    :return: visualisation hist of centrality distribution
-    """
+        print(rem_CC, ' network components with less than two nodes have been removed', end='\n')
 
-    fig = plt.figure()
-    ax = fig.add_subplot()
-    N, bins, patches = ax.hist([miR_G.nodes[node]['BtweenCentrl'] for node in miR_G.nodes])
-    ax.set(xlabel='Centrality',
-           ylabel='Count of nodes')
-    ax.yaxis.label.set_size(30)
-    ax.xaxis.label.set_size(30)
-    ax.tick_params(labelsize=20)
+        PORT_NUMBER = 1234
+        IP = 'localhost'
+        BASE = 'http://' + IP + ':' + str(PORT_NUMBER) + '/v1/'
 
-    ax.axvline(key_nodes[list(key_nodes.keys())[-1]], color='red', lw='4')
+        requests.delete(BASE + 'session')  # Delete all networks in current session
 
-    right_side = ax.spines["right"]
-    right_side.set_visible(False)
-    top_side = ax.spines["top"]
-    top_side.set_visible(False)
+        cytoscape_network = cy.from_networkx(miR_G)
+        cytoscape_network['data']['name'] = 'miR_Net'
+        res1 = requests.post(BASE + 'networks', data=json.dumps(cytoscape_network))
+        res1_dict = res1.json()
+        new_suid = res1_dict['networkSUID']
+        requests.get(BASE + 'apply/layouts/force-directed/' + str(new_suid))
 
-    # create gradient (grey_to_red hist path
-    grey = Color('#cccccc')
-    colors = list(grey.range_to(Color("red"), len(bins) - 1))
-    for tmp_color, tmp_patch in zip(colors, patches):
-        color = str(tmp_color)
-        if len(color) < 7 and color[0] == '#':
-            color = color + (7 - len(color)) * color[len(color) - 1]
-        tmp_patch.set_facecolor(color)
+        # load and apply style
 
-    fig.set_figwidth(8.5)
-    fig.set_figheight(8.5)
+        res = requests.get(BASE + 'styles/miR_Net_Styles')
+        if res.status_code != 200:
 
-    plt.tight_layout()
+            with open('./options/cytoscape_styles/miR_Net_Styles.json') as json_file:
+                miR_Net_Styles = json.load(json_file)
 
-    plt.savefig('./result/' + mir_name + '_centrality_distr.png', dpi=250)
+            for mapings in range(0, len(miR_Net_Styles['mappings'])):
+                if miR_Net_Styles['mappings'][mapings]['visualProperty'] == 'NODE_LABEL_FONT_SIZE':
+                    miR_Net_Styles['mappings'][mapings]['points'][1]['value'] = max(centrality_node.values())
+                if miR_Net_Styles['mappings'][mapings]['visualProperty'] == 'NODE_SIZE':
+                    miR_Net_Styles['mappings'][mapings]['points'][1]['value'] = max(centrality_node.values())
+                if miR_Net_Styles['mappings'][mapings]['visualProperty'] == 'NODE_FILL_COLOR':
+                    miR_Net_Styles['mappings'][mapings]['points'][1]['value'] = max(centrality_node.values())
 
+            # Create new Visual Style
+            res = requests.post(BASE + "styles", data=json.dumps(miR_Net_Styles))
 
-def draw_key_nodes_extractor(card_LCC, n_CC, idx_max_dy, mir_name):
-    """
+        # Apply it to current network
 
-    :param card_LCC:
-    :param n_CC:
-    :param idx_max_dy:
-    :param mir_name:
-    :return: visualisation plot of key nodes selection
-    """
+        requests.get(
+            BASE + 'apply/styles/' + 'miR_Net_Styles' + '/' + str(new_suid))  # !Это говно почему-то не работает
 
-    fig = plt.figure()
-    ax = fig.add_subplot()
-    ax.plot(card_LCC, linewidth=4, label='Cardinality of the LCC')
-    ax.plot(n_CC, linewidth=4, label='Count of CC', color='tab:green', linestyle='dashed')
-    # ax.plot(idx_max_dy, card_LCC[idx_max_dy], marker='o', markersize=20, color="red")
-    ax.axvline(idx_max_dy, color='red', lw='4')
-    ax.minorticks_on()
-    ax.grid(which='major',
-            color='w',
-            linewidth=1.3)
-    ax.grid(which='minor',
-            color='w',
-            linestyle=':')
-    ax.set(xlabel='Number of top nodes removed',
-           ylabel='LCC cardinality / Count of CC')
-    ax.legend()
+    def key_nodes_extractor(self):
 
-    right_side = ax.spines["right"]
-    right_side.set_visible(False)
-    top_side = ax.spines["top"]
-    top_side.set_visible(False)
+        card_LCC = self.card_LCC
+        n_CC = self.n_CC
+        idx_max_dy = self.idx_max_dy
+        mir_name = self.miR_name
+        """
 
-    #    plt.rc('font', size=10)  # controls default text sizes
-    plt.rc('axes', labelsize=30)  # fontsize of the x and y labels
-    plt.rc('xtick', labelsize=20)  # fontsize of the tick labels
-    plt.rc('ytick', labelsize=20)  # fontsize of the tick labels
-    plt.rc('legend', fontsize=20)  # legend fontsize
-    fig.set_figwidth(8)
-    fig.set_figheight(8)
-    plt.tight_layout()
+        :param card_LCC:
+        :param n_CC:
+        :param idx_max_dy:
+        :param mir_name:
+        :return: visualisation plot of key nodes selection
+        """
 
-    plt.savefig('./result/' + mir_name + 'key_nodes_selection.png', dpi=300)
+        fig = plt.figure()
+        ax = fig.add_subplot()
+        ax.plot(card_LCC, linewidth=4, label='Cardinality of the LCC')
+        ax.plot(n_CC, linewidth=4, label='Count of CC', color='tab:green', linestyle='dashed')
+        # ax.plot(idx_max_dy, card_LCC[idx_max_dy], marker='o', markersize=20, color="red")
+        ax.axvline(idx_max_dy, color='red', lw='4')
+        ax.minorticks_on()
+        ax.grid(which='major',
+                color='w',
+                linewidth=1.3)
+        ax.grid(which='minor',
+                color='w',
+                linestyle=':')
+        ax.set(xlabel='Number of top nodes removed',
+               ylabel='LCC cardinality / Count of CC')
+        ax.legend()
+
+        right_side = ax.spines["right"]
+        right_side.set_visible(False)
+        top_side = ax.spines["top"]
+        top_side.set_visible(False)
+
+        #    plt.rc('font', size=10)  # controls default text sizes
+        plt.rc('axes', labelsize=30)  # fontsize of the x and y labels
+        plt.rc('xtick', labelsize=20)  # fontsize of the tick labels
+        plt.rc('ytick', labelsize=20)  # fontsize of the tick labels
+        plt.rc('legend', fontsize=20)  # legend fontsize
+        fig.set_figwidth(8)
+        fig.set_figheight(8)
+        plt.tight_layout()
+
+        plt.savefig('./result/' + mir_name + 'key_nodes_selection.png', dpi=300)
