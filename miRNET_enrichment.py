@@ -210,14 +210,14 @@ def get_dendro(dt, key_nodes_dict,mir_name):
         return '{}: ({})'.format(''.join(dtid2name[id2name[x]]), ', '.join(gene_set_dict[id2name[x]]))
 
     # Draw dendrogram using matplotlib to scipy-dendrogram.pdf
-    plt.figure()
+    my_dpi = 10
+    plt.figure(figsize=(2400 / my_dpi, 2400 / my_dpi), dpi=my_dpi)
     fig, axes = plt.subplots()
     scipy.cluster.hierarchy.dendrogram(clusters,
                                        leaf_label_func=getlabel,
                                        orientation='right')
-
     fig.set_figwidth(10)
-    fig.set_figheight(8)
+    fig.set_figheight(16)
     plt.tight_layout()
 
     """
