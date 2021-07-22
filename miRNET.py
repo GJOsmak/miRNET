@@ -13,9 +13,16 @@ from colour import Color
 
 class BaseData:
 
-    def __init__(self):
-        string = pd.read_csv('./baseData/String_interactome.csv')
-        self.interactome = nx.from_pandas_edgelist(string, 'Source', 'Target')
+    def __init__(self, interactome=None):
+        if not interactome:
+            string = pd.read_csv('./baseData/String_interactome.csv')
+            self.interactome = nx.from_pandas_edgelist(string, 'Source', 'Target')
+        else:
+            interactome = pd.DataFrame(interactome)
+            assert interactome.shape[1] == 2, 'It takes two columns: "Source" and "Target"'
+            assert sum(interactome.columns == ['Source', 'Target']) == 2, 'Columns names are not "Source" and "Target"'
+            self.interactome = interactome
+            print('interactome contain ', interactome.shape[0], ' rows')
 
 
 def tissue_selector():
