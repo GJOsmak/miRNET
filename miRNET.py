@@ -11,7 +11,7 @@ from colour import Color
 
 #   load interactome from String and convert to nx Graph
 
-class BaseData:
+class MainNet:
 
     def __init__(self, interactome=None):
         if not interactome:
@@ -78,10 +78,10 @@ def tissue_selector():
 
 class KeyNodesExtractor:
 
-    def __init__(self, Regulome):
+    def __init__(self, MirNet):
         self.key_nodes = dict()
-        self.net = Regulome.get_LCC()
-        self.node_centrality = Regulome.get_LCCnd_centrality()
+        self.net = MirNet.get_LCC()
+        self.node_centrality = MirNet.get_LCCnd_centrality()
         self.graph_features = {'card_LCC': [len(self.net.nodes())],
                                'n_CC': [len(list(nx.connected_component_subgraphs(self.net)))],
                                'transitivity': [nx.transitivity(self.net)],
@@ -113,7 +113,7 @@ class KeyNodesExtractor:
             self.net.remove_node(k)
             if len(self.net.nodes()) == 0:
                 break
-            LCC_curent = Regulome(self.net).get_LCC()
+            LCC_curent = MirNet(self.net).get_LCC()
             self.graph_features['card_LCC'].append(len(LCC_curent.nodes()))
             self.graph_features['n_CC'].append(len(list(nx.connected_component_subgraphs(self.net))))
             self.graph_features['transitivity'].append(nx.transitivity(LCC_curent))
@@ -179,7 +179,7 @@ class Targets:
         return res
 
 
-class Regulome:
+class MirNet:
 
     def __init__(self, interactome):
         self.G = interactome
@@ -225,13 +225,13 @@ class Regulome:
 
 #   visualisation tools
 
-class plots:
+class Plots:
 
-    def __init__(self, Regulome, KeyNodesExtractor, miR_name):
-        self.miR_G = Regulome.LCC
+    def __init__(self, MirNet, KeyNodesExtractor, miR_name):
+        self.miR_G = MirNet.LCC
         self.key_nodes = KeyNodesExtractor.key_nodes
         self.miR_name = miR_name
-        self.centrality_node = Regulome.get_LCCnd_centrality()
+        self.centrality_node = MirNet.get_LCCnd_centrality()
         self.card_LCC = KeyNodesExtractor.graph_features['card_LCC']
         self.n_CC = KeyNodesExtractor.graph_features['n_CC']
         self.idx_max_dy = KeyNodesExtractor.graph_features['cutoff_point']
