@@ -149,7 +149,7 @@ class KeyNodesExtractor:
             self.net.remove_node(k)
             if len(self.net.nodes()) == 0:
                 break
-            LCC_curent = MirNet(self.net).get_LCC()
+            LCC_curent = MainNet(self.net).get_LCC()
             self.graph_features['card_LCC'].append(len(LCC_curent.nodes()))
             self.graph_features['n_CC'].append(len(list(nx.connected_component_subgraphs(self.net))))
             self.graph_features['transitivity'].append(nx.transitivity(LCC_curent))
