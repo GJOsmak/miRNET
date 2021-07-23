@@ -141,14 +141,15 @@ class Targets:
     The class extracts and stores the targets of one microRNA and its name
     """
 
-    miR_dict = {}
-    with open('./baseData/hsa_miRTarBase.csv') as interact:  # import targets from miRTarBase
-        for line in interact:
-            (key, val) = line.strip().split(';')
-            if key in miR_dict:
-                miR_dict[key] += [val]
-            else:
-                miR_dict[key] = [val]
+    def __init__(self, path_to_miRTarBase):
+        self.miR_dict = {}
+        with open(path_to_miRTarBase) as interact:  # import targets from miRTarBase
+            for line in interact:
+                (key, val) = line.strip().split(';')
+                if key in self.miR_dict:
+                    self.miR_dict[key] += [val]
+                else:
+                    self.miR_dict[key] = [val]
 
     def get_targets(self, miR_name):
         """
