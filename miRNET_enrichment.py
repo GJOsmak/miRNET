@@ -11,13 +11,13 @@ import scipy.cluster
 import matplotlib.pyplot as plt
 from colour import Color
 
-def reactome_enrichment(gene_set):
+def reactome_enrichment(gene_set, species='Homo sapiens'):
     target_set = ",".join(gene_set)
 
     result = analysis.identifiers(ids=target_set)
     token = result['summary']['token']
 
-    token_result = analysis.token(token, species='Homo sapiens', page_size='-1', page='-1', sort_by='ENTITIES_FDR',
+    token_result = analysis.token(token, species=species, page_size='-1', page='-1', sort_by='ENTITIES_FDR',
                                   order='ASC', resource='TOTAL', p_value='0.05', include_disease=False,
                                   min_entities=2, max_entities=None)
 
@@ -97,7 +97,7 @@ def get_net(ReactomeRes):
     return G_enrich
 
 
-def dendro_reactome_to_pandas(ReactomeRes, G):
+def dendro_reactome_to_pandas(ReactomeRes, G, species='Homo sapiens'):
 
     url = 'https://reactome.org/AnalysisService/download/' + ReactomeRes.token + \
           '/pathways/TOTAL/result.csv'
@@ -106,12 +106,12 @@ def dendro_reactome_to_pandas(ReactomeRes, G):
 
     reactome_df = reactome_df[reactome_df['Entities pValue'] < 0.05]
     reactome_df = reactome_df[reactome_df['#Entities found'] >= 2]
-    reactome_df = reactome_df[reactome_df['Species name'] == 'Homo sapiens']
+    reactome_df = reactome_df[reactome_df['Species name'] == species]
     reactome_df = reactome_df[reactome_df['Pathway identifier'].isin(G.nodes)]
 
     return reactome_df
 
-
+"""
 def draw_net_to_cytoscape(G, ReactomeRes):
 
     PORT_NUMBER = 1234
@@ -162,7 +162,7 @@ def draw_net_to_cytoscape(G, ReactomeRes):
         BASE + 'apply/styles/' + 'PathwayEnrichStyles' + '/' + str(new_suid))  # !Это говно почему-то не работает
 
     return res
-
+"""
 
 # Dendrograms
 

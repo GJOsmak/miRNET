@@ -14,15 +14,51 @@ from colour import Color
 class MainNet:
 
     def __init__(self, interactome=None):
-        if not interactome:
+        if not isinstance(interactome, pd.DataFrame):
             string = pd.read_csv('./baseData/String_interactome.csv')
-            self.interactome = nx.from_pandas_edgelist(string, 'Source', 'Target')
+            self.G = nx.from_pandas_edgelist(string, 'Source', 'Target')
         else:
             interactome = pd.DataFrame(interactome)
             assert interactome.shape[1] == 2, 'It takes two columns: "Source" and "Target"'
             assert sum(interactome.columns == ['Source', 'Target']) == 2, 'Columns names are not "Source" and "Target"'
-            self.interactome = interactome
+            self.G = nx.from_pandas_edgelist(interactome, 'Source', 'Target')
             print('interactome contain ', interactome.shape[0], ' rows')
+
+    def get_LCCnd_centrality(self):
+        """
+        return: sorted dict of node centrality
+        """
+        centrality_node = nx.betweenness_centrality(self.get_LCC())
+        degree_centrality = nx.degree_centrality(self.get_LCC())
+        for k, v in centrality_node.items():
+            centrality_node[k] = centrality_node[k] + degree_centrality[k]
+        centrality_node = {k: v for k, v in sorted(centrality_node.items(), key=lambda item: item[1], reverse=True)}
+
+        for nods, dct in self.LCC.nodes(data=True):
+            dct['BtweenCentrl'] = centrality_node[nods]
+
+        return centrality_node
+
+    def get_LCC(self):
+        """
+        return: the Largest Connected Component, as NetrworkX object
+        """
+        CC_G = sorted(nx.connected_component_subgraphs(self.G), key=len, reverse=True)
+        self.LCC = CC_G[0]
+
+        # print(len(CC_G), 'total connected components')
+        # print(len(CC_G[0].nodes), 'LCC cardinality')
+
+        return CC_G[0]
+
+    def select_nodes(self, gene_set):
+        """
+        param gene_set: tissue or another gene set
+        """
+
+        self.G = self.G.subgraph(gene_set)
+        if self.LCC:
+            self.LCC = self.LCC.subgraph(gene_set)
 
 
 def tissue_selector():
@@ -100,7 +136,7 @@ class KeyNodesExtractor:
         dy = np.diff(y)  # first derivative
         idx_max_dy = np.argmax(dy)
         if card_LCC[idx_max_dy] > n_CC[idx_max_dy]:
-            return KeyNodesExtractor.inflection_finder(n_CC, sigma + 0.2)
+            return KeyNodesExtractor.inflection_finder(card_LCC, n_CC, sigma + 0.2)
         else:
             return idx_max_dy
 
@@ -124,8 +160,6 @@ class KeyNodesExtractor:
         idx_max_dy = KeyNodesExtractor.inflection_finder(card_LCC=self.graph_features['card_LCC'],
                                                          n_CC=self.graph_features['n_CC'],
                                                          sigma=0.0001)
-
-        # idx_max_dy = np.argmax(np.array(graph_char['n_CC']) > np.array(graph_char['card_LCC']))
 
         self.graph_features['cutoff_point'] = idx_max_dy
 
@@ -178,51 +212,6 @@ class Targets:
         print('and ', len(res), 'unique targets')
 
         return res
-
-
-class MirNet:
-
-    def __init__(self, interactome):
-        self.G = interactome
-
-    def get_LCCnd_centrality(self):
-        """
-        :param G: a Graph
-        :return: sorted dict of node centrality
-        """
-        centrality_node = nx.betweenness_centrality(self.get_LCC())
-        degree_centrality = nx.degree_centrality(self.get_LCC())
-        for k, v in centrality_node.items():
-            centrality_node[k] = centrality_node[k] + degree_centrality[k]
-        centrality_node = {k: v for k, v in sorted(centrality_node.items(), key=lambda item: item[1], reverse=True)}
-
-        for nods, dct in self.LCC.nodes(data=True):
-            dct['BtweenCentrl'] = centrality_node[nods]
-
-        return centrality_node
-
-    def get_LCC(self):
-        """
-        :param G: networkX Graph
-        :return: the Largest Connected Component, as NetrworkX object
-        """
-        CC_G = sorted(nx.connected_component_subgraphs(self.G), key=len, reverse=True)
-        self.LCC = CC_G[0]
-
-        # print(len(CC_G), 'total connected components')
-        # print(len(CC_G[0].nodes), 'LCC cardinality')
-
-        return CC_G[0]
-
-    def select_nodes(self, gene_set):
-        """
-        :param gene_set: tissue or another gene set
-        """
-
-        self.G = self.G.subgraph(gene_set)
-        if self.LCC:
-            self.LCC = self.LCC.subgraph(gene_set)
-
 
 #   visualisation tools
 
